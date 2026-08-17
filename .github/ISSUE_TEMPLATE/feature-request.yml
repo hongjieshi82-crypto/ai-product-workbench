@@ -1,0 +1,22 @@
+name: 功能建议
+description: 提交与个人产品工作台范围一致的改进建议
+title: "[建议] "
+body:
+  - type: textarea
+    attributes:
+      label: 需要解决的问题
+      description: 请先说明实际工作中遇到的问题，不要只描述按钮或页面。
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 希望如何改进
+      description: 说明期望的操作方式和结果。
+    validations:
+      required: true
+  - type: checkboxes
+    attributes:
+      label: 范围确认
+      options:
+        - label: 这个建议与产品目标、任务、场景、需求、功能、迭代、Bug、Badcase、日历或 Case 聚类有关
+          required: true

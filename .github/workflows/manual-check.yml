@@ -1,0 +1,29 @@
+name: 手动检查个人产品工作台
+
+on:
+  workflow_dispatch:
+
+jobs:
+  web-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 获取代码
+        uses: actions/checkout@v4
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.3.0
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.18.0
+          cache: pnpm
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+      - name: 检查网页类型
+        run: pnpm --filter=web check:types
+      - name: 检查个人工作台代码
+        run: >-
+          pnpm --filter=web exec oxlint
+          'app/(all)/personal-workbench/page.tsx'
+          core/services/personal-workbench.service.ts
