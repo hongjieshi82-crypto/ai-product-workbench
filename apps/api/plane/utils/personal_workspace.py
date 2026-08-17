@@ -186,7 +186,7 @@ def _ensure_workbench_tables(project, user):
             issue_type=issue_type,
             defaults={"level": table_data["sort_order"], "created_by": user},
         )
-        PersonalWorkbenchTable.objects.get_or_create(
+        table, created = PersonalWorkbenchTable.objects.get_or_create(
             project=project,
             key=table_data["key"],
             defaults={
@@ -201,6 +201,53 @@ def _ensure_workbench_tables(project, user):
                 "created_by": user,
             },
         )
+        if created:
+            continue
+
+        # Product updates may add fields or views. Merge only missing definitions so
+        # existing records, edited options, and imported schema remain untouched.
+        fields = list(table.fields or [])
+        existing_field_ids = {field.get("id") for field in fields}
+        existing_field_names = {field.get("name") for field in fields}
+        added_field_ids = []
+        for field in table_data["fields"]:
+            if field["id"] in existing_field_ids or field["name"] in existing_field_names:
+                continue
+            fields.append(field)
+            existing_field_ids.add(field["id"])
+            existing_field_names.add(field["name"])
+            added_field_ids.append(field["id"])
+
+        views = [dict(view) for view in (table.views or [])]
+        existing_view_ids = {view.get("id") for view in views}
+        existing_view_names = {view.get("name") for view in views}
+        for view in table_data["views"]:
+            if view["id"] in existing_view_ids or view["name"] in existing_view_names:
+                continue
+            views.append(view)
+            existing_view_ids.add(view["id"])
+            existing_view_names.add(view["name"])
+
+        if added_field_ids:
+            for view in views:
+                view_fields = list(view.get("fields") or [])
+                if view.get("type") == 8:
+                    continue
+                for field_id in added_field_ids:
+                    if field_id not in view_fields:
+                        view_fields.append(field_id)
+                view["fields"] = view_fields
+
+        update_fields = []
+        if fields != table.fields:
+            table.fields = fields
+            update_fields.append("fields")
+        if views != table.views:
+            table.views = views
+            update_fields.append("views")
+        if update_fields:
+            table.updated_by = user
+            table.save(update_fields=[*update_fields, "updated_by", "updated_at"])
 
 
 @transaction.atomic

@@ -94,7 +94,7 @@ def _sync_issue(item, user):
                 "P2": "medium",
                 "P3": "low",
             }.get(value, issue.priority)
-        elif field["name"] == "开始时间":
+        elif field["name"] in {"开始时间", "开始日期"}:
             issue.start_date = _date_value(value)
         elif field["name"] in {"结束时间", "截止日期"}:
             issue.target_date = _date_value(value)

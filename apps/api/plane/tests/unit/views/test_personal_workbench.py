@@ -141,6 +141,28 @@ def test_calendar_returns_scheduled_personal_items():
 
 @pytest.mark.unit
 @pytest.mark.django_db
+def test_iteration_start_date_updates_the_calendar_schedule():
+    result = _personal_workspace()
+    setup_user_personal_workspace(result.user)
+    table = PersonalWorkbenchTable.objects.get(project=result.project, key="iterations")
+    item = _create_item(result, table)
+    request = APIRequestFactory().patch(
+        f"/api/personal-workbench/items/{item.id}/",
+        {"values": {"iteration-start": "2026-08-20", "iteration-due": "2026-08-24"}},
+        format="json",
+    )
+    force_authenticate(request, user=result.user)
+
+    response = PersonalWorkbenchItemDetailEndpoint.as_view()(request, item_id=item.id)
+
+    assert response.status_code == 200
+    item.issue.refresh_from_db()
+    assert item.issue.start_date == date(2026, 8, 20)
+    assert item.issue.target_date == date(2026, 8, 24)
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
 def test_update_field_options_preserves_existing_item_values():
     result = _personal_workspace()
     table = PersonalWorkbenchTable.objects.create(

@@ -115,6 +115,27 @@ def test_each_user_gets_an_empty_isolated_workbench_without_admin_access():
 
 @pytest.mark.unit
 @pytest.mark.django_db
+def test_existing_workbench_only_receives_missing_timeline_schema():
+    user = User.objects.create(email="timeline@example.com", username="timeline-user")
+    result = setup_user_personal_workspace(user)
+    table = PersonalWorkbenchTable.objects.get(project=result.project, key="iterations")
+    table.fields = [field for field in table.fields if field["id"] != "iteration-start"]
+    table.views = [view for view in table.views if view["type"] != 8]
+    status_field = next(field for field in table.fields if field["id"] == "iteration-status")
+    status_field["options"] = [{"id": "custom", "name": "我自己的状态", "color": 2}]
+    table.save(update_fields=["fields", "views", "updated_at"])
+
+    setup_user_personal_workspace(user)
+
+    table.refresh_from_db()
+    assert any(field["id"] == "iteration-start" for field in table.fields)
+    assert any(view["type"] == 8 and view["name"] == "时间轴" for view in table.views)
+    status_field = next(field for field in table.fields if field["id"] == "iteration-status")
+    assert status_field["options"] == [{"id": "custom", "name": "我自己的状态", "color": 2}]
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
 @override_settings(
     PERSONAL_WORKSPACE_EMAIL="personal@plane.local",
     PERSONAL_WORKSPACE_ALLOWED_HOSTS={"localhost", "127.0.0.1", "::1"},

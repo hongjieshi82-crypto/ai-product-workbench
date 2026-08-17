@@ -65,7 +65,12 @@ def _table(key, name, sort_order, fields, view_names):
         "primary_field_id": primary_field[0],
         "fields": normalized_fields,
         "views": [
-            _view(f"{key}-view-{index}", view_name, field_ids, 7 if "日历" in view_name else 1)
+            _view(
+                f"{key}-view-{index}",
+                view_name,
+                field_ids,
+                8 if "时间轴" in view_name else 7 if "日历" in view_name else 1,
+            )
             for index, view_name in enumerate(view_names)
         ],
         "source_schema": {},
@@ -180,11 +185,12 @@ PERSONAL_WORKBENCH_TEMPLATE = [
             FIELD("iteration-status", "进度状态", 3, "SingleSelect"),
             FIELD("iteration-complete", "是否完成", 7, "Checkbox"),
             FIELD("iteration-version", "迭代版本", 3, "SingleSelect"),
+            FIELD("iteration-start", "开始日期", 5, "DateTime"),
             FIELD("iteration-created", "创建日期", 5, "DateTime"),
             FIELD("iteration-due", "截止日期", 5, "DateTime"),
             FIELD("iteration-attachment", "关联附件", 15, "Url"),
         ],
-        ["总任务", "待办事项", "任务截止日历"],
+        ["总任务", "待办事项", "任务截止日历", "时间轴"],
     ),
     _table(
         "bugs",

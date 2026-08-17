@@ -36,6 +36,7 @@ import { setToast, TOAST_TYPE } from "@plane/propel/toast";
 import { CaseClusterRoot, CreateCaseClusterAnalysisModal } from "@/components/case-cluster";
 import { ScheduleCalendar } from "@/components/personal-workbench/calendar";
 import { OptionEditorModal } from "@/components/personal-workbench/option-editor-modal";
+import { IterationTimeline } from "@/components/personal-workbench/timeline";
 import {
   type TPersonalWorkbenchViewSettings,
   ViewEditorModal,
@@ -605,6 +606,7 @@ export default function PersonalWorkbenchPage() {
     !search &&
     visibleItems.length > 1 &&
     !reordering;
+  const isIterationTimeline = activeTable?.key === "iterations" && activeView?.type === 8;
 
   if (loading)
     return (
@@ -811,6 +813,12 @@ export default function PersonalWorkbenchPage() {
           ) : itemsLoading ? (
             <div className="flex h-full items-center justify-center">
               <Loader2 className="h-6 w-6 animate-spin text-[#d9a20b]" />
+            </div>
+          ) : isIterationTimeline && activeTable ? (
+            <div className="h-full p-5">
+              <div className="h-full overflow-hidden rounded-lg border border-[#e6e8ec] bg-white shadow-[0_1px_3px_rgba(37,47,73,0.06)]">
+                <IterationTimeline table={activeTable} items={visibleItems} />
+              </div>
             </div>
           ) : (
             <div className="h-full p-5">
