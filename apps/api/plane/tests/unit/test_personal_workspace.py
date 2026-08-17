@@ -10,10 +10,24 @@ from django.contrib.sessions.middleware import SessionMiddleware
 from django.test import RequestFactory, override_settings
 from django.utils import timezone
 
-from plane.db.models import Profile, Project, ProjectMember, State, User, Workspace, WorkspaceMember
+from plane.db.models import (
+    PersonalWorkbenchItem,
+    PersonalWorkbenchTable,
+    Profile,
+    Project,
+    ProjectMember,
+    State,
+    User,
+    Workspace,
+    WorkspaceMember,
+)
 from plane.license.models import Instance, InstanceAdmin
 from plane.middleware.personal_workspace import PersonalWorkspaceMiddleware
-from plane.utils.personal_workspace import setup_personal_workspace
+from plane.utils.personal_workspace import (
+    is_workbench_dev_login_enabled,
+    setup_personal_workspace,
+    setup_user_personal_workspace,
+)
 
 
 def _instance():
@@ -82,6 +96,25 @@ def test_setup_personal_workspace_preserves_existing_user_workspace_and_project(
 
 @pytest.mark.unit
 @pytest.mark.django_db
+def test_each_user_gets_an_empty_isolated_workbench_without_admin_access():
+    first_user = User.objects.create(email="first@example.com", username="first-user")
+    second_user = User.objects.create(email="second@example.com", username="second-user")
+
+    first = setup_user_personal_workspace(first_user)
+    second = setup_user_personal_workspace(second_user)
+
+    assert first.workspace != second.workspace
+    assert first.project != second.project
+    assert first.workspace.owner == first_user
+    assert second.workspace.owner == second_user
+    assert PersonalWorkbenchTable.objects.filter(project=first.project).count() == 9
+    assert PersonalWorkbenchTable.objects.filter(project=second.project).count() == 9
+    assert PersonalWorkbenchItem.objects.filter(project__in=[first.project, second.project]).count() == 0
+    assert not InstanceAdmin.objects.filter(user__in=[first_user, second_user]).exists()
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
 @override_settings(
     PERSONAL_WORKSPACE_EMAIL="personal@plane.local",
     PERSONAL_WORKSPACE_ALLOWED_HOSTS={"localhost", "127.0.0.1", "::1"},
@@ -103,3 +136,15 @@ def test_personal_workspace_middleware_logs_in_only_on_localhost():
 
     assert local_request.user == result.user
     assert remote_request.user.is_anonymous
+
+
+@pytest.mark.unit
+@override_settings(
+    DEBUG=False,
+    WORKBENCH_DEV_LOGIN_CODE=True,
+    PERSONAL_WORKSPACE_ALLOWED_HOSTS={"localhost"},
+)
+def test_development_login_code_is_never_enabled_in_production():
+    request = RequestFactory().get("/auth/magic-generate/", HTTP_HOST="localhost:8000")
+
+    assert is_workbench_dev_login_enabled(request) is False

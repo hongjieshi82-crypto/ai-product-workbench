@@ -5,6 +5,7 @@
 import json
 from uuid import UUID
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Prefetch, Q
 from django.utils import timezone
@@ -30,6 +31,21 @@ from .. import BaseAPIView
 
 MAX_CASE_CLUSTER_ISSUES = 100
 CASE_CLUSTER_SOURCE_TYPES = {"scenarios", "requirements", "badcases"}
+
+
+def _can_access_personal_project(request, slug, project_id):
+    if not settings.PRODUCT_WORKBENCH_MODE:
+        return True
+    return Project.objects.filter(
+        id=project_id,
+        workspace__slug=slug,
+        external_source="personal_workbench",
+        external_id=str(request.user.id),
+    ).exists()
+
+
+def _personal_project_not_found():
+    return Response({"error": "个人产品不存在"}, status=status.HTTP_404_NOT_FOUND)
 
 
 def _analysis_queryset(slug, project_id):
@@ -96,6 +112,8 @@ def _validated_issue_ids(raw_issue_ids):
 class CaseClusterCandidateEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id):
+        if not _can_access_personal_project(request, slug, project_id):
+            return _personal_project_not_found()
         search = request.GET.get("search", "").strip()
         queryset = (
             Issue.objects.filter(
@@ -117,6 +135,8 @@ class CaseClusterCandidateEndpoint(BaseAPIView):
 class CaseClusterAnalysisEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id):
+        if not _can_access_personal_project(request, slug, project_id):
+            return _personal_project_not_found()
         return Response(
             CaseClusterAnalysisSerializer(_analysis_queryset(slug, project_id), many=True).data,
             status=status.HTTP_200_OK,
@@ -124,6 +144,8 @@ class CaseClusterAnalysisEndpoint(BaseAPIView):
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def post(self, request, slug, project_id):
+        if not _can_access_personal_project(request, slug, project_id):
+            return _personal_project_not_found()
         issue_ids = _validated_issue_ids(request.data.get("issue_ids"))
         if issue_ids is None or len(issue_ids) < 2:
             return Response({"error": "请至少选择两个有效事项"}, status=status.HTTP_400_BAD_REQUEST)
@@ -248,6 +270,8 @@ class CaseClusterAnalysisEndpoint(BaseAPIView):
 class CaseClusterAnalysisDetailEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def get(self, request, slug, project_id, analysis_id):
+        if not _can_access_personal_project(request, slug, project_id):
+            return _personal_project_not_found()
         return Response(
             _serialize_analysis(slug, project_id, analysis_id),
             status=status.HTTP_200_OK,
@@ -257,6 +281,8 @@ class CaseClusterAnalysisDetailEndpoint(BaseAPIView):
 class CaseClusterDetailEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def patch(self, request, slug, project_id, analysis_id, cluster_id):
+        if not _can_access_personal_project(request, slug, project_id):
+            return _personal_project_not_found()
         cluster = CaseCluster.objects.filter(
             id=cluster_id,
             analysis_id=analysis_id,
@@ -279,6 +305,8 @@ class CaseClusterDetailEndpoint(BaseAPIView):
 class CaseClusterMergeEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def post(self, request, slug, project_id, analysis_id):
+        if not _can_access_personal_project(request, slug, project_id):
+            return _personal_project_not_found()
         source_ids = _validated_issue_ids(request.data.get("source_cluster_ids"))
         try:
             target_id = str(UUID(str(request.data.get("target_cluster_id"))))
@@ -318,6 +346,8 @@ class CaseClusterMergeEndpoint(BaseAPIView):
 class CaseClusterSplitEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def post(self, request, slug, project_id, analysis_id, cluster_id):
+        if not _can_access_personal_project(request, slug, project_id):
+            return _personal_project_not_found()
         issue_ids = _validated_issue_ids(request.data.get("issue_ids"))
         category = request.data.get("category")
         name = str(request.data.get("name") or "").strip()[:255]
@@ -364,6 +394,8 @@ class CaseClusterSplitEndpoint(BaseAPIView):
 class CaseClusterItemEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def patch(self, request, slug, project_id, analysis_id, item_id):
+        if not _can_access_personal_project(request, slug, project_id):
+            return _personal_project_not_found()
         try:
             target_cluster_id = UUID(str(request.data.get("cluster_id")))
         except (TypeError, ValueError, AttributeError):

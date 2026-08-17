@@ -8,6 +8,11 @@ from .common import *  # noqa
 
 DEBUG = True
 
+# Product-specific redirects are covered by focused workbench tests. Keep the
+# shared authentication contract suite on its standard redirect behavior.
+PRODUCT_WORKBENCH_MODE = False
+WORKBENCH_DEV_LOGIN_CODE = False
+
 # Send it in a dummy outbox
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 

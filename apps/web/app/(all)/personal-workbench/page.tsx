@@ -22,6 +22,7 @@ import {
   Layers3,
   ListChecks,
   Loader2,
+  LogOut,
   Plus,
   Settings2,
   Search,
@@ -40,6 +41,7 @@ import {
   ViewEditorModal,
 } from "@/components/personal-workbench/view-editor-modal";
 import { PersonalWorkbenchService } from "@/services/personal-workbench.service";
+import { useUser } from "@/hooks/store/user";
 import type {
   TPersonalWorkbenchField,
   TPersonalWorkbenchItem,
@@ -285,6 +287,7 @@ const columnWidth = (
 export default function PersonalWorkbenchPage() {
   const navigate = useNavigate();
   const { section } = useParams();
+  const { signOut } = useUser();
   const [tables, setTables] = useState<TPersonalWorkbenchTable[]>([]);
   const [items, setItems] = useState<TPersonalWorkbenchItem[]>([]);
   const [workspace, setWorkspace] = useState({ slug: "", projectId: "" });
@@ -663,9 +666,19 @@ export default function PersonalWorkbenchPage() {
             );
           })}
         </nav>
-        <div className="text-xs flex items-center border-t border-[#eeeef0] px-5 py-4 text-[#9299a6]">
-          <span className="mr-2 h-2 w-2 rounded-full bg-[#ffc928]" />
-          数据仅保存在你的工作台
+        <div className="border-t border-[#eeeef0] px-3 py-3">
+          <div className="text-xs flex items-center px-2 pb-2 text-[#9299a6]">
+            <span className="mr-2 h-2 w-2 rounded-full bg-[#ffc928]" />
+            数据仅保存在你的工作台
+          </div>
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className="text-sm flex h-9 w-full items-center rounded-md px-2 text-[#697283] hover:bg-[#f6f7f9] hover:text-[#252f49]"
+          >
+            <LogOut className="mr-2.5 h-4 w-4" />
+            退出登录
+          </button>
         </div>
       </aside>
 

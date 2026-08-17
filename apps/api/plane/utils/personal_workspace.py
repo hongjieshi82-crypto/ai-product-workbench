@@ -7,8 +7,12 @@ from uuid import uuid4
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
+from django.http.request import split_domain_port
 
 from plane.db.models import (
+    IssueType,
+    PersonalWorkbenchTable,
     Profile,
     Project,
     ProjectIdentifier,
@@ -18,7 +22,9 @@ from plane.db.models import (
     Workspace,
     WorkspaceMember,
 )
+from plane.db.models.issue_type import ProjectIssueType
 from plane.license.models import Instance, InstanceAdmin
+from plane.utils.personal_workbench_template import get_personal_workbench_template
 
 
 PERSONAL_PROJECT_STATES = [
@@ -42,6 +48,13 @@ class PersonalWorkspaceSetup:
     user: User
     workspace: Workspace
     project: Project
+
+
+def is_workbench_dev_login_enabled(request):
+    if not settings.DEBUG or not settings.WORKBENCH_DEV_LOGIN_CODE:
+        return False
+    host, _ = split_domain_port(request.get_host())
+    return host in settings.PERSONAL_WORKSPACE_ALLOWED_HOSTS
 
 
 def get_personal_user():
@@ -72,93 +85,149 @@ def _available_workspace_slug():
     return slug
 
 
-@transaction.atomic
-def setup_personal_workspace(instance: Instance) -> PersonalWorkspaceSetup:
-    user = get_personal_user()
-    if user is None:
-        user = User(
-            email=settings.PERSONAL_WORKSPACE_EMAIL.strip().lower(),
-            username=uuid4().hex,
-            display_name="我的工作台",
-            first_name="我",
+def _existing_personal_project(user):
+    membership = (
+        ProjectMember.objects.select_related("project", "project__workspace")
+        .filter(
+            member=user,
             is_active=True,
-            is_email_verified=True,
-            is_email_valid=True,
-            user_timezone="Asia/Shanghai",
+            project__external_source="personal_workbench",
+            project__external_id=str(user.id),
         )
-        user.set_unusable_password()
-        user.save()
-
-    profile, _ = Profile.objects.get_or_create(user=user)
-
-    workspace_member = (
-        WorkspaceMember.objects.select_related("workspace")
-        .filter(member=user, is_active=True)
         .order_by("created_at")
         .first()
     )
-    if workspace_member:
-        workspace = workspace_member.workspace
-    else:
-        workspace = Workspace.objects.create(
-            name="个人工作台",
-            slug=_available_workspace_slug(),
-            owner=user,
-            timezone="Asia/Shanghai",
-            created_by=user,
-        )
-        WorkspaceMember.objects.create(workspace=workspace, member=user, role=20, created_by=user)
+    if membership:
+        return membership.project
 
-    project_member = (
-        ProjectMember.objects.select_related("project")
-        .filter(member=user, workspace=workspace, is_active=True)
+    # Preserve the original local workbench, which predates the project marker.
+    membership = (
+        ProjectMember.objects.select_related("project", "project__workspace")
+        .filter(
+            Q(project__project_lead=user) | Q(project__workspace__owner=user),
+            member=user,
+            is_active=True,
+            project__project_personalworkbenchtable__isnull=False,
+        )
         .order_by("created_at")
         .first()
     )
-    project = project_member.project if project_member else Project.objects.filter(workspace=workspace).first()
-    if project is None:
-        project = Project.objects.create(
-            name="个人产品",
-            identifier="PM",
-            description="",
-            network=0,
-            workspace=workspace,
-            project_lead=user,
-            timezone="Asia/Shanghai",
-            created_by=user,
-        )
-        ProjectIdentifier.objects.create(
-            name=project.identifier,
-            project=project,
-            workspace=workspace,
-            created_by=user,
-        )
-        State.objects.bulk_create(
-            [
-                State(
-                    name=state["name"],
-                    color=state["color"],
-                    project=project,
-                    workspace=workspace,
-                    sequence=state["sequence"],
-                    group=state["group"],
-                    default=state.get("default", False),
-                    created_by=user,
-                )
-                for state in PERSONAL_PROJECT_STATES
-            ]
-        )
+    if membership:
+        project = membership.project
+        project.external_source = "personal_workbench"
+        project.external_id = str(user.id)
+        project.save(update_fields=["external_source", "external_id", "updated_at"])
+        return project
+    return None
 
-    ProjectMember.objects.get_or_create(
+
+def _create_personal_project(user):
+    workspace = Workspace.objects.create(
+        name="个人工作台",
+        slug=_available_workspace_slug(),
+        owner=user,
+        timezone="Asia/Shanghai",
+        created_by=user,
+    )
+    WorkspaceMember.objects.create(workspace=workspace, member=user, role=20, created_by=user)
+    project = Project.objects.create(
+        name="个人产品",
+        identifier="PM",
+        description="",
+        network=0,
+        workspace=workspace,
+        project_lead=user,
+        timezone="Asia/Shanghai",
+        external_source="personal_workbench",
+        external_id=str(user.id),
+        is_issue_type_enabled=True,
+        created_by=user,
+    )
+    ProjectIdentifier.objects.create(
+        name=project.identifier,
         project=project,
-        member=user,
-        defaults={"role": 20, "created_by": user},
+        workspace=workspace,
+        created_by=user,
     )
-    InstanceAdmin.objects.get_or_create(
-        instance=instance,
-        user=user,
-        defaults={"role": 20, "is_verified": True, "created_by": user},
+    State.objects.bulk_create(
+        [
+            State(
+                name=state["name"],
+                color=state["color"],
+                project=project,
+                workspace=workspace,
+                sequence=state["sequence"],
+                group=state["group"],
+                default=state.get("default", False),
+                created_by=user,
+            )
+            for state in PERSONAL_PROJECT_STATES
+        ]
     )
+    ProjectMember.objects.create(project=project, member=user, role=20, created_by=user)
+    return project
+
+
+def _ensure_workbench_tables(project, user):
+    for table_data in get_personal_workbench_template():
+        issue_type, _ = IssueType.objects.get_or_create(
+            workspace=project.workspace,
+            external_source="personal_workbench",
+            external_id=table_data["key"],
+            defaults={
+                "name": table_data["name"],
+                "description": "个人产品工作台事项类型",
+                "is_active": True,
+                "created_by": user,
+            },
+        )
+        ProjectIssueType.objects.get_or_create(
+            project=project,
+            issue_type=issue_type,
+            defaults={"level": table_data["sort_order"], "created_by": user},
+        )
+        PersonalWorkbenchTable.objects.get_or_create(
+            project=project,
+            key=table_data["key"],
+            defaults={
+                "workspace": project.workspace,
+                "name": table_data["name"],
+                "source_table_id": table_data["source_table_id"],
+                "sort_order": table_data["sort_order"],
+                "primary_field_id": table_data["primary_field_id"],
+                "fields": table_data["fields"],
+                "views": table_data["views"],
+                "source_schema": table_data["source_schema"],
+                "created_by": user,
+            },
+        )
+
+
+@transaction.atomic
+def setup_user_personal_workspace(
+    user: User,
+    *,
+    reuse_existing_project: bool = False,
+    ensure_tables: bool = True,
+) -> PersonalWorkspaceSetup:
+    profile, _ = Profile.objects.get_or_create(user=user)
+    project = _existing_personal_project(user)
+    if project is None and reuse_existing_project:
+        membership = (
+            ProjectMember.objects.select_related("project", "project__workspace")
+            .filter(member=user, is_active=True)
+            .order_by("created_at")
+            .first()
+        )
+        if membership:
+            project = membership.project
+            project.external_source = "personal_workbench"
+            project.external_id = str(user.id)
+            project.save(update_fields=["external_source", "external_id", "updated_at"])
+    project = project or _create_personal_project(user)
+    workspace = project.workspace
+    if ensure_tables:
+        _ensure_workbench_tables(project, user)
 
     profile.is_onboarded = True
     profile.is_tour_completed = True
@@ -183,6 +252,37 @@ def setup_personal_workspace(instance: Instance) -> PersonalWorkspaceSetup:
         ]
     )
 
+    return PersonalWorkspaceSetup(user=user, workspace=workspace, project=project)
+
+
+@transaction.atomic
+def setup_personal_workspace(instance: Instance) -> PersonalWorkspaceSetup:
+    user = get_personal_user()
+    if user is None:
+        user = User(
+            email=settings.PERSONAL_WORKSPACE_EMAIL.strip().lower(),
+            username=uuid4().hex,
+            display_name="我的工作台",
+            first_name="我",
+            is_active=True,
+            is_email_verified=True,
+            is_email_valid=True,
+            user_timezone="Asia/Shanghai",
+        )
+        user.set_unusable_password()
+        user.save()
+
+    result = setup_user_personal_workspace(
+        user,
+        reuse_existing_project=True,
+        ensure_tables=False,
+    )
+    InstanceAdmin.objects.get_or_create(
+        instance=instance,
+        user=user,
+        defaults={"role": 20, "is_verified": True, "created_by": user},
+    )
+
     if not instance.is_setup_done:
         instance.instance_name = "个人工作台"
         instance.is_setup_done = True
@@ -200,4 +300,4 @@ def setup_personal_workspace(instance: Instance) -> PersonalWorkspaceSetup:
             ]
         )
 
-    return PersonalWorkspaceSetup(user=user, workspace=workspace, project=project)
+    return result

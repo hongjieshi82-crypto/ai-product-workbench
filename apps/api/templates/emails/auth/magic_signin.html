@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Your Plane login code</title>
+    <title>个人产品工作台登录验证码</title>
 
     <style>
       /* Basic resets for email clients */
@@ -73,7 +73,7 @@
         visibility: hidden;
       "
     >
-      Your Plane login code {{code}} is valid for 10 minutes.
+      你的个人产品工作台登录验证码是 {{code}}，10 分钟内有效。
     </span>
 
     <!-- Outer Wrapper -->
@@ -98,12 +98,7 @@
             >
               <tr>
                 <td style="padding: 24px 40px; text-align: center;">
-                  <img
-                    src="https://media.docs.plane.so/logo/new-logo-dark.png"
-                    width="120"
-                    alt="Plane"
-                    style="height: auto; display: block; margin: 0 auto;"
-                  />
+                  <strong style="font-size: 20px; color: #ffffff;">个人产品工作台</strong>
                 </td>
               </tr>
             </table>
@@ -152,7 +147,7 @@
                       color: #111111;
                     "
                   >
-                    Your login code for Plane
+                    登录验证码
                   </h1>
 
                   <!-- Code chip -->
@@ -184,8 +179,7 @@
                       color: #5f5e5e;
                     "
                   >
-                    This code is valid for the next 10 minutes. Enter it on the
-                    sign-in page to complete your login.
+                    验证码 10 分钟内有效，请回到登录页面输入验证码。
                   </p>
 
                   <!-- Secondary info -->
@@ -197,7 +191,7 @@
                       color: #5f5e5e;
                     "
                   >
-                    Note: This email was sent to
+                    这封邮件发送至
                     <span
                       style="
                         font-family: 'Courier New', Courier, monospace;
@@ -208,8 +202,7 @@
                         border: 1px solid #e9e9e9;
                       "
                       >{{email}}</span
-                    >. If you were not expecting a sign-in code, you can safely
-                    ignore this message.
+                    >。如果不是你本人操作，请忽略这封邮件。
                   </p>
                 </td>
               </tr>
@@ -248,7 +241,7 @@
                   "
                 >
                   <p style="margin: 0;">
-                    Plane Software, Inc.
+                    个人产品工作台
                   </p>
                 </td>
               </tr>

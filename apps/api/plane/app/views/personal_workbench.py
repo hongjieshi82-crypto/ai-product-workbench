@@ -11,19 +11,14 @@ from rest_framework import status
 from rest_framework.response import Response
 
 from plane.app.views.base import BaseAPIView
-from plane.db.models import Issue, IssueType, PersonalWorkbenchItem, PersonalWorkbenchTable, ProjectMember
+from plane.db.models import Issue, IssueType, PersonalWorkbenchItem, PersonalWorkbenchTable
+from plane.utils.personal_workspace import setup_user_personal_workspace
 
 
 def _personal_project(user):
     if not user or not user.is_authenticated:
         return None
-    membership = (
-        ProjectMember.objects.select_related("project", "project__workspace")
-        .filter(member=user, is_active=True)
-        .order_by("created_at")
-        .first()
-    )
-    return membership.project if membership else None
+    return setup_user_personal_workspace(user).project
 
 
 def _serialize_table(table):

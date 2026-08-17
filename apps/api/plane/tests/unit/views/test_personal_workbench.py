@@ -13,12 +13,13 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 from plane.app.views.personal_workbench import (
     PersonalWorkbenchCalendarEndpoint,
     PersonalWorkbenchFieldOptionsEndpoint,
+    PersonalWorkbenchItemEndpoint,
     PersonalWorkbenchItemDetailEndpoint,
     PersonalWorkbenchItemReorderEndpoint,
 )
-from plane.db.models import Issue, PersonalWorkbenchItem, PersonalWorkbenchTable
+from plane.db.models import Issue, PersonalWorkbenchItem, PersonalWorkbenchTable, User
 from plane.license.models import Instance
-from plane.utils.personal_workspace import setup_personal_workspace
+from plane.utils.personal_workspace import setup_personal_workspace, setup_user_personal_workspace
 
 
 def _personal_workspace():
@@ -236,3 +237,33 @@ def test_reorder_items_rejects_an_incomplete_table_order():
 
     assert response.status_code == 400
     assert list(table.items.values_list("id", flat=True)) == [first.id, second.id]
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+def test_workbench_endpoints_never_return_another_users_items():
+    first_user = User.objects.create(email="first@example.com", username="first-user")
+    second_user = User.objects.create(email="second@example.com", username="second-user")
+    first = setup_user_personal_workspace(first_user)
+    second = setup_user_personal_workspace(second_user)
+    first_table = PersonalWorkbenchTable.objects.get(project=first.project, key="requirements")
+    first_item = _create_item(first, first_table)
+
+    list_request = APIRequestFactory().get("/api/personal-workbench/items/?section=requirements")
+    force_authenticate(list_request, user=second_user)
+    list_response = PersonalWorkbenchItemEndpoint.as_view()(list_request)
+
+    update_request = APIRequestFactory().patch(
+        f"/api/personal-workbench/items/{first_item.id}/",
+        {first_table.primary_field_id: "不应被修改"},
+        format="json",
+    )
+    force_authenticate(update_request, user=second_user)
+    update_response = PersonalWorkbenchItemDetailEndpoint.as_view()(update_request, item_id=first_item.id)
+
+    assert first.project != second.project
+    assert list_response.status_code == 200
+    assert list_response.data == []
+    assert update_response.status_code == 404
+    first_item.refresh_from_db()
+    assert first_item.values == {"title": "测试排期"}

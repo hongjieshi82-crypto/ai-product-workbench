@@ -7,6 +7,7 @@ import json
 import os
 import secrets
 
+from django.conf import settings
 
 # Module imports
 from plane.authentication.adapter.credential import CredentialAdapter
@@ -17,6 +18,7 @@ from plane.authentication.adapter.error import (
     AuthenticationException,
 )
 from plane.db.models import User
+from plane.utils.personal_workspace import is_workbench_dev_login_enabled
 
 
 class MagicCodeProvider(CredentialAdapter):
@@ -54,7 +56,10 @@ class MagicCodeProvider(CredentialAdapter):
             ]
         )
 
-        if not (EMAIL_HOST):
+        if settings.PRODUCT_WORKBENCH_MODE:
+            ENABLE_MAGIC_LINK_LOGIN = "1"
+
+        if not EMAIL_HOST and not is_workbench_dev_login_enabled(request):
             raise AuthenticationException(
                 error_code=AUTHENTICATION_ERROR_CODES["SMTP_NOT_CONFIGURED"],
                 error_message="SMTP_NOT_CONFIGURED",

@@ -3,6 +3,7 @@
 # See the LICENSE file for details.
 
 # Django imports
+from django.conf import settings
 from django.core.validators import validate_email
 from django.http import HttpResponseRedirect
 from django.views import View
@@ -31,6 +32,7 @@ from plane.authentication.rate_limit import (
     authentication_throttle_allows,
 )
 from plane.utils.path_validator import get_safe_redirect_url
+from plane.utils.personal_workspace import is_workbench_dev_login_enabled
 
 
 class MagicGenerateEndpoint(APIView):
@@ -53,9 +55,16 @@ class MagicGenerateEndpoint(APIView):
             validate_email(email)
             adapter = MagicCodeProvider(request=request, key=email)
             key, token = adapter.initiate()
-            # If the smtp is configured send through here
-            magic_link.delay(email, key, token)
-            return Response({"key": str(key)}, status=status.HTTP_200_OK)
+            dev_login = is_workbench_dev_login_enabled(request)
+            if not dev_login:
+                magic_link.delay(email, key, token)
+            payload = {
+                "key": str(key),
+                "existing": User.objects.filter(email=email).exists(),
+            }
+            if dev_login:
+                payload["dev_code"] = token
+            return Response(payload, status=status.HTTP_200_OK)
         except AuthenticationException as e:
             params = e.get_error_dict()
             return Response(params, status=status.HTTP_400_BAD_REQUEST)
@@ -120,7 +129,9 @@ class MagicSignInEndpoint(View):
             profile, _ = Profile.objects.get_or_create(user=user)
             # Login the user and record his device info
             user_login(request=request, user=user, is_app=True)
-            if user.is_password_autoset and profile.is_onboarded:
+            if settings.PRODUCT_WORKBENCH_MODE:
+                path = "/workbench"
+            elif user.is_password_autoset and profile.is_onboarded:
                 # Redirect to the home page
                 path = "/"
             else:
@@ -201,7 +212,9 @@ class MagicSignUpEndpoint(View):
             # Login the user and record his device info
             user_login(request=request, user=user, is_app=True)
             # Get the redirection path
-            if next_path:
+            if settings.PRODUCT_WORKBENCH_MODE:
+                path = "/workbench"
+            elif next_path:
                 path = next_path
             else:
                 path = get_redirection_path(user=user)

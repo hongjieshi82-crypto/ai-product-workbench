@@ -5,10 +5,9 @@
  */
 
 import React from "react";
-// components
-import { AuthBase } from "@/components/auth-screens/auth-base";
+import { WorkbenchLogin } from "@/components/auth-screens/workbench-login";
 // helpers
-import { EAuthModes, EPageTypes } from "@/helpers/authentication.helper";
+import { EPageTypes } from "@/helpers/authentication.helper";
 // layouts
 import DefaultLayout from "@/layouts/default-layout";
 // wrappers
@@ -18,7 +17,7 @@ function HomePage() {
   return (
     <DefaultLayout>
       <AuthenticationWrapper pageType={EPageTypes.NON_AUTHENTICATED}>
-        <AuthBase authType={EAuthModes.SIGN_IN} />
+        <WorkbenchLogin />
       </AuthenticationWrapper>
     </DefaultLayout>
   );

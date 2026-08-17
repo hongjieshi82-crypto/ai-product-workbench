@@ -96,6 +96,8 @@ ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "*").split(",")
 # Explicit single-user mode for local personal installations.
 PERSONAL_WORKSPACE_MODE = os.environ.get("PERSONAL_WORKSPACE_MODE", "0") == "1"
 PERSONAL_WORKSPACE_EMAIL = os.environ.get("PERSONAL_WORKSPACE_EMAIL", "personal@plane.local")
+PRODUCT_WORKBENCH_MODE = os.environ.get("PRODUCT_WORKBENCH_MODE", "0") == "1"
+WORKBENCH_DEV_LOGIN_CODE = os.environ.get("WORKBENCH_DEV_LOGIN_CODE", "0") == "1"
 PERSONAL_WORKSPACE_ALLOWED_HOSTS = {
     host.strip()
     for host in os.environ.get(
