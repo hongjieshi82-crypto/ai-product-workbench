@@ -136,6 +136,63 @@ def test_existing_workbench_only_receives_missing_timeline_schema():
 
 @pytest.mark.unit
 @pytest.mark.django_db
+def test_existing_requirements_table_receives_new_fields_without_losing_custom_options():
+    user = User.objects.create(email="requirements@example.com", username="requirements-user")
+    result = setup_user_personal_workspace(user)
+    table = PersonalWorkbenchTable.objects.get(project=result.project, key="requirements")
+    table.fields = [
+        field for field in table.fields if field["id"] not in {"requirement-source", "requirement-description"}
+    ]
+    goal_field = next(field for field in table.fields if field["id"] == "requirement-goal")
+    imported_field_ids = {
+        "requirement-title": "imported-requirement-title",
+        "requirement-goal": "imported-requirement-goal",
+        "requirement-scenario": "imported-requirement-scenario",
+    }
+    for field in table.fields:
+        field["id"] = imported_field_ids.get(field["id"], field["id"])
+    goal_field["name"] = "需求目标"
+    goal_field["options"] = [{"id": "custom", "name": "增长", "color": 2}]
+    for view in table.views:
+        view["fields"] = [
+            imported_field_ids.get(field_id, field_id)
+            for field_id in view["fields"]
+            if field_id not in {"requirement-source", "requirement-description"}
+        ]
+    table.save(update_fields=["fields", "views", "updated_at"])
+
+    setup_user_personal_workspace(user)
+
+    table.refresh_from_db()
+    requirement_field_ids = [field["id"] for field in table.fields]
+    assert requirement_field_ids[:5] == [
+        "imported-requirement-title",
+        "imported-requirement-goal",
+        "requirement-source",
+        "requirement-description",
+        "imported-requirement-scenario",
+    ]
+    goal_field = next(field for field in table.fields if field["id"] == "imported-requirement-goal")
+    assert goal_field["name"] == "建设方向/目标"
+    assert goal_field["options"] == [{"id": "custom", "name": "增长", "color": 2}]
+    assert not any(field["id"] == "requirement-goal" for field in table.fields)
+    source_field = next(field for field in table.fields if field["id"] == "requirement-source")
+    assert [option["name"] for option in source_field["options"]] == [
+        "用户反馈",
+        "客户需求",
+        "内部规划",
+        "数据分析",
+        "竞品调研",
+        "合规要求",
+    ]
+    for view in table.views:
+        if view["type"] == 8:
+            continue
+        assert view["fields"][:5] == requirement_field_ids[:5]
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
 @override_settings(
     PERSONAL_WORKSPACE_EMAIL="personal@plane.local",
     PERSONAL_WORKSPACE_ALLOWED_HOSTS={"localhost", "127.0.0.1", "::1"},

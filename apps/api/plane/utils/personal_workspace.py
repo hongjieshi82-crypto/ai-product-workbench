@@ -42,6 +42,10 @@ PERSONAL_PROJECT_STATES = [
     {"name": "待评估", "color": "#4E5355", "sequence": 65000, "group": "triage"},
 ]
 
+PERSONAL_WORKBENCH_FIELD_RENAMES = {
+    ("requirements", "需求目标"): "建设方向/目标",
+}
+
 
 @dataclass(frozen=True)
 class PersonalWorkspaceSetup:
@@ -206,17 +210,57 @@ def _ensure_workbench_tables(project, user):
 
         # Product updates may add fields or views. Merge only missing definitions so
         # existing records, edited options, and imported schema remain untouched.
-        fields = list(table.fields or [])
-        existing_field_ids = {field.get("id") for field in fields}
-        existing_field_names = {field.get("name") for field in fields}
+        fields = [dict(field) for field in (table.fields or [])]
+        for field in fields:
+            renamed_field = PERSONAL_WORKBENCH_FIELD_RENAMES.get((table_data["key"], field.get("name")))
+            if renamed_field:
+                field["name"] = renamed_field
+        template_to_actual_field_ids = {}
         added_field_ids = []
-        for field in table_data["fields"]:
-            if field["id"] in existing_field_ids or field["name"] in existing_field_names:
+        for template_index, field in enumerate(table_data["fields"]):
+            existing_field = next(
+                (
+                    existing_field
+                    for existing_field in fields
+                    if existing_field.get("id") == field["id"] or existing_field.get("name") == field["name"]
+                ),
+                None,
+            )
+            if existing_field:
+                template_to_actual_field_ids[field["id"]] = existing_field["id"]
                 continue
-            fields.append(field)
-            existing_field_ids.add(field["id"])
-            existing_field_names.add(field["name"])
+            insert_at = len(fields)
+            for previous_field in reversed(table_data["fields"][:template_index]):
+                previous_actual_id = template_to_actual_field_ids.get(previous_field["id"])
+                previous_index = next(
+                    (
+                        index
+                        for index, existing_field in enumerate(fields)
+                        if existing_field.get("id") == previous_actual_id
+                    ),
+                    None,
+                )
+                if previous_index is not None:
+                    insert_at = previous_index + 1
+                    break
+            fields.insert(insert_at, field)
+            template_to_actual_field_ids[field["id"]] = field["id"]
             added_field_ids.append(field["id"])
+
+        if table_data["key"] == "requirements":
+            requirement_front_ids = [
+                template_to_actual_field_ids[field_id]
+                for field_id in [
+                    "requirement-title",
+                    "requirement-goal",
+                    "requirement-source",
+                    "requirement-description",
+                ]
+            ]
+            fields_by_id = {field["id"]: field for field in fields}
+            fields = [fields_by_id[field_id] for field_id in requirement_front_ids] + [
+                field for field in fields if field["id"] not in requirement_front_ids
+            ]
 
         views = [dict(view) for view in (table.views or [])]
         existing_view_ids = {view.get("id") for view in views}
@@ -235,8 +279,49 @@ def _ensure_workbench_tables(project, user):
                     continue
                 for field_id in added_field_ids:
                     if field_id not in view_fields:
-                        view_fields.append(field_id)
+                        template_view = next(
+                            (
+                                template_view
+                                for template_view in table_data["views"]
+                                if template_view["id"] == view.get("id") or template_view["name"] == view.get("name")
+                            ),
+                            None,
+                        )
+                        template_fields = (
+                            [
+                                template_to_actual_field_ids.get(template_field_id, template_field_id)
+                                for template_field_id in template_view.get("fields", [])
+                            ]
+                            if template_view
+                            else []
+                        )
+                        template_index = (
+                            template_fields.index(field_id) if field_id in template_fields else len(template_fields)
+                        )
+                        insert_at = len(view_fields)
+                        for previous_field_id in reversed(template_fields[:template_index]):
+                            if previous_field_id in view_fields:
+                                insert_at = view_fields.index(previous_field_id) + 1
+                                break
+                        view_fields.insert(insert_at, field_id)
                 view["fields"] = view_fields
+
+        if table_data["key"] == "requirements":
+            requirement_front_ids = [
+                template_to_actual_field_ids[field_id]
+                for field_id in [
+                    "requirement-title",
+                    "requirement-goal",
+                    "requirement-source",
+                    "requirement-description",
+                ]
+            ]
+            for view in views:
+                view_fields = list(view.get("fields") or [])
+                visible_front_ids = [field_id for field_id in requirement_front_ids if field_id in view_fields]
+                view["fields"] = visible_front_ids + [
+                    field_id for field_id in view_fields if field_id not in visible_front_ids
+                ]
 
         update_fields = []
         if fields != table.fields:

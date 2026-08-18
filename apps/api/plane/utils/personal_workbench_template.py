@@ -14,6 +14,7 @@ DEFAULT_OPTIONS = {
     "评分（0-5）": ["0", "1", "2", "3", "4", "5"],
     "数据评分": ["1", "2", "3", "4", "5"],
     "价值评分": ["1", "2", "3", "4", "5"],
+    "需求来源": ["用户反馈", "客户需求", "内部规划", "数据分析", "竞品调研", "合规要求"],
 }
 
 
@@ -142,7 +143,9 @@ PERSONAL_WORKBENCH_TEMPLATE = [
         3,
         [
             FIELD("requirement-title", "需求名称", primary=True),
-            FIELD("requirement-goal", "需求目标", 3, "SingleSelect"),
+            FIELD("requirement-goal", "建设方向/目标", 3, "SingleSelect"),
+            FIELD("requirement-source", "需求来源", 4, "MultiSelect"),
+            FIELD("requirement-description", "需求描述"),
             FIELD("requirement-scenario", "关联场景", 21, "DuplexLink"),
             FIELD("requirement-owner", "开发/算法负责人", 11, "User"),
             FIELD("requirement-designer", "设计负责人", 11, "User"),

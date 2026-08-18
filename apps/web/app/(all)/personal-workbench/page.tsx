@@ -72,6 +72,16 @@ const SECTION_ICONS = {
   "case-clusters": Sparkles,
 };
 
+const tableDisplayName = (table: TPersonalWorkbenchTable | null | undefined): string => {
+  if (!table) return "个人产品工作台";
+  return table.key === "product-goals" ? "产品目标 (OKR)" : table.name;
+};
+
+const viewDisplayName = (table: TPersonalWorkbenchTable | null | undefined, view: TPersonalWorkbenchView): string => {
+  if (table?.key === "product-goals" && view.name === table.name) return "产品目标 (OKR)";
+  return view.name;
+};
+
 const asText = (value: unknown): string => {
   if (value === null || value === undefined) return "";
   if (Array.isArray(value)) return value.map(asText).filter(Boolean).join("、");
@@ -666,7 +676,7 @@ export default function PersonalWorkbenchPage() {
                 }`}
               >
                 <Icon className={`mr-3 h-4 w-4 shrink-0 ${active ? "text-[#d9a20b]" : ""}`} />
-                <span className="min-w-0 flex-1 truncate">{table.name}</span>
+                <span className="min-w-0 flex-1 truncate">{tableDisplayName(table)}</span>
                 <span
                   className={`ml-2 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] ${
                     active ? "bg-white/80 text-[#9b7400]" : "bg-[#f2f3f5] text-[#9299a6]"
@@ -697,8 +707,8 @@ export default function PersonalWorkbenchPage() {
       <main className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-[72px] shrink-0 items-center justify-between border-b border-[#e8e9ec] bg-white px-7">
           <div>
-            <h1 className="text-xl font-semibold text-[#252f49]">
-              {isCalendar ? "排期日历" : activeTable?.name || "个人产品工作台"}
+            <h1 className="text-2xl font-semibold text-[#252f49]">
+              {isCalendar ? "排期日历" : tableDisplayName(activeTable)}
             </h1>
             <p className="text-xs mt-1 text-[#9299a6]">
               {isCalendar
@@ -791,13 +801,13 @@ export default function PersonalWorkbenchPage() {
                   key={view.id}
                   type="button"
                   onClick={() => setViewId(view.id)}
-                  className={`text-sm h-10 border-b-2 px-3 ${
+                  className={`text-base h-10 border-b-2 px-3 ${
                     (activeView?.id || "default") === view.id
                       ? "border-[#ffc928] font-medium text-[#252f49]"
                       : "border-transparent text-[#858d9b] hover:text-[#252f49]"
                   }`}
                 >
-                  {view.name}
+                  {viewDisplayName(activeTable, view)}
                 </button>
               ))}
             </div>
@@ -842,7 +852,7 @@ export default function PersonalWorkbenchPage() {
                 <table className="text-sm w-max min-w-full border-separate border-spacing-0 text-left">
                   <thead className="sticky top-0 z-20 bg-[#fafbfc]">
                     <tr>
-                      <th className="text-xs font-normal sticky left-0 z-30 h-11 w-12 min-w-12 border-r border-b border-[#e9eaed] bg-[#fafbfc] text-center text-[#a0a7b2]">
+                      <th className="text-sm font-normal sticky left-0 z-30 h-11 w-12 min-w-12 border-r border-b border-[#e9eaed] bg-[#fafbfc] text-center text-[#a0a7b2]">
                         #
                       </th>
                       {visibleFields.map((field, index) => {
@@ -851,7 +861,7 @@ export default function PersonalWorkbenchPage() {
                           <th
                             key={field.id}
                             style={{ width, minWidth: width }}
-                            className={`text-xs h-11 border-r border-b border-[#e9eaed] px-3 font-semibold text-[#656e7d] ${
+                            className={`text-sm h-11 border-r border-b border-[#e9eaed] px-3 font-semibold text-[#656e7d] ${
                               index === 0 ? "sticky left-12 z-20 bg-[#fafbfc]" : "relative"
                             }`}
                           >
