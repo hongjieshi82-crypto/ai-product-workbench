@@ -3,6 +3,7 @@
 # See the LICENSE file for details.
 
 from datetime import date
+from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
@@ -12,6 +13,7 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 
 from plane.app.views.personal_workbench import (
     PersonalWorkbenchCalendarEndpoint,
+    PersonalWorkbenchAISuggestionEndpoint,
     PersonalWorkbenchFieldOptionsEndpoint,
     PersonalWorkbenchItemEndpoint,
     PersonalWorkbenchItemDetailEndpoint,
@@ -159,6 +161,54 @@ def test_iteration_start_date_updates_the_calendar_schedule():
     item.issue.refresh_from_db()
     assert item.issue.start_date == date(2026, 8, 20)
     assert item.issue.target_date == date(2026, 8, 24)
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+@patch("plane.app.views.personal_workbench.get_llm_config", return_value=(None, None, None))
+def test_ai_suggestion_does_not_create_an_item(mock_llm_config):
+    result = _personal_workspace()
+    setup_user_personal_workspace(result.user)
+    request = APIRequestFactory().post(
+        "/api/personal-workbench/ai-suggestion/",
+        {"text": "用户反馈搜索结果经常不准确，希望可以按时间筛选"},
+        format="json",
+    )
+    force_authenticate(request, user=result.user)
+
+    response = PersonalWorkbenchAISuggestionEndpoint.as_view()(request)
+
+    assert response.status_code == 200
+    assert response.data["table_key"] == "scenarios"
+    assert response.data["mode"] == "local"
+    assert response.data["source_text"] == "用户反馈搜索结果经常不准确，希望可以按时间筛选"
+    assert PersonalWorkbenchItem.objects.filter(project=result.project).count() == 0
+    mock_llm_config.assert_called_once()
+
+
+@pytest.mark.unit
+@pytest.mark.django_db
+def test_confirmed_ai_item_preserves_the_original_input():
+    result = _personal_workspace()
+    setup_user_personal_workspace(result.user)
+    table = PersonalWorkbenchTable.objects.get(project=result.project, key="requirements")
+    source_text = "希望搜索结果可以按时间筛选"
+    request = APIRequestFactory().post(
+        "/api/personal-workbench/items/",
+        {
+            "section": "requirements",
+            "values": {table.primary_field_id: "增加搜索时间筛选"},
+            "source_text": source_text,
+        },
+        format="json",
+    )
+    force_authenticate(request, user=result.user)
+
+    response = PersonalWorkbenchItemEndpoint.as_view()(request)
+
+    assert response.status_code == 201
+    item = PersonalWorkbenchItem.objects.get(id=response.data["id"])
+    assert item.source_values == {"ai_original_input": source_text}
 
 
 @pytest.mark.unit

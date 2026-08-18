@@ -63,3 +63,13 @@ export type TPersonalWorkbenchCalendarItem = {
   start_date: string;
   end_date: string;
 };
+
+export type TPersonalWorkbenchAISuggestion = {
+  table_key: string;
+  reason: string;
+  confidence: number;
+  values: Record<string, unknown>;
+  source_text: string;
+  mode: "ai" | "local";
+  notice: string;
+};

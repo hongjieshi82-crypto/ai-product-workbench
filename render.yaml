@@ -1,0 +1,76 @@
+services:
+  - type: web
+    name: personal-product-workbench-preview
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerContext: .
+    dockerfilePath: ./deployments/render-test/Dockerfile
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    maxShutdownDelaySeconds: 30
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: personal-product-workbench-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: personal-product-workbench-cache
+          property: connectionString
+      - key: AMQP_URL
+        fromService:
+          type: keyvalue
+          name: personal-product-workbench-cache
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: LIVE_SERVER_SECRET_KEY
+        generateValue: true
+      - key: PREVIEW_USERNAME
+        value: workbench
+      - key: PREVIEW_PASSWORD
+        sync: false
+      - key: DEBUG
+        value: "0"
+      - key: IS_TEST
+        value: "1"
+      - key: PRODUCT_WORKBENCH_MODE
+        value: "1"
+      - key: PERSONAL_WORKSPACE_MODE
+        value: "1"
+      - key: PERSONAL_WORKSPACE_EMAIL
+        value: preview@workbench.local
+      - key: WORKBENCH_DEV_LOGIN_CODE
+        value: "0"
+      - key: CELERY_TASK_ALWAYS_EAGER
+        value: "1"
+      - key: CELERY_TASK_EAGER_PROPAGATES
+        value: "1"
+      - key: GUNICORN_WORKERS
+        value: "1"
+      - key: USE_MINIO
+        value: "0"
+      - key: APP_VERSION
+        value: preview
+      - key: LLM_PROVIDER
+        value: deepseek
+      - key: LLM_MODEL
+        value: deepseek-v4-flash
+
+  - type: keyvalue
+    name: personal-product-workbench-cache
+    plan: free
+    region: singapore
+    ipAllowList: []
+    maxmemoryPolicy: allkeys-lru
+
+databases:
+  - name: personal-product-workbench-db
+    plan: free
+    region: singapore
+    databaseName: workbench
+    user: workbench
+    postgresMajorVersion: "15"
+    ipAllowList: []

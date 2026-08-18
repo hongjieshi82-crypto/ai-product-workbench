@@ -34,6 +34,7 @@ import {
 import { useNavigate, useParams } from "react-router";
 import { setToast, TOAST_TYPE } from "@plane/propel/toast";
 import { CaseClusterRoot, CreateCaseClusterAnalysisModal } from "@/components/case-cluster";
+import { AIWorkbenchEntry } from "@/components/personal-workbench/ai-entry";
 import { ScheduleCalendar } from "@/components/personal-workbench/calendar";
 import { OptionEditorModal } from "@/components/personal-workbench/option-editor-modal";
 import { IterationTimeline } from "@/components/personal-workbench/timeline";
@@ -608,6 +609,15 @@ export default function PersonalWorkbenchPage() {
     !reordering;
   const isIterationTimeline = activeTable?.key === "iterations" && activeView?.type === 8;
 
+  const handleAICreated = (tableKey: string, item: TPersonalWorkbenchItem) => {
+    setTables((current) =>
+      current.map((table) => (table.key === tableKey ? { ...table, item_count: table.item_count + 1 } : table))
+    );
+    if (activeTable?.key === tableKey) setItems((current) => [...current, item]);
+    navigate(`/workbench/${tableKey}`);
+    setToast({ type: TOAST_TYPE.SUCCESS, title: "已添加", message: "AI 整理的内容已保存到工作台" });
+  };
+
   if (loading)
     return (
       <div className="flex h-screen items-center justify-center bg-[#f6f7f9]">
@@ -753,6 +763,12 @@ export default function PersonalWorkbenchPage() {
             </div>
           )}
         </header>
+
+        <AIWorkbenchEntry
+          tables={tables}
+          onCreated={handleAICreated}
+          onError={(message) => setToast({ type: TOAST_TYPE.ERROR, title: "AI 整理失败", message })}
+        />
 
         {!isCalendar && !showClusterAnalysis && (
           <div className="flex h-12 shrink-0 items-end border-b border-[#e8e9ec] bg-white px-7">

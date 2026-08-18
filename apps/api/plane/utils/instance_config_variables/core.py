@@ -222,13 +222,13 @@ llm_config_variables = [
     },
     {
         "key": "LLM_PROVIDER",
-        "value": os.environ.get("LLM_PROVIDER", "openai"),
+        "value": os.environ.get("LLM_PROVIDER", "deepseek"),
         "category": "AI",
         "is_encrypted": False,
     },
     {
         "key": "LLM_MODEL",
-        "value": os.environ.get("LLM_MODEL", "gpt-4o-mini"),
+        "value": os.environ.get("LLM_MODEL", "deepseek-v4-flash"),
         "category": "AI",
         "is_encrypted": False,
     },

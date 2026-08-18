@@ -29,6 +29,7 @@ class LLMProvider:
     name: str = ""
     models: List[str] = []
     default_model: str = ""
+    base_url: str | None = None
 
     @classmethod
     def get_config(cls) -> Dict[str, str | List[str]]:
@@ -43,6 +44,13 @@ class OpenAIProvider(LLMProvider):
     name = "OpenAI"
     models = ["gpt-3.5-turbo", "gpt-4o-mini", "gpt-4o", "o1-mini", "o1-preview"]
     default_model = "gpt-4o-mini"
+
+
+class DeepSeekProvider(LLMProvider):
+    name = "DeepSeek"
+    models = ["deepseek-v4-flash", "deepseek-v4-pro"]
+    default_model = "deepseek-v4-flash"
+    base_url = "https://api.deepseek.com"
 
 
 class AnthropicProvider(LLMProvider):
@@ -68,6 +76,7 @@ class GeminiProvider(LLMProvider):
 
 SUPPORTED_PROVIDERS = {
     "openai": OpenAIProvider,
+    "deepseek": DeepSeekProvider,
     "anthropic": AnthropicProvider,
     "gemini": GeminiProvider,
 }
@@ -78,7 +87,7 @@ def get_llm_config() -> Tuple[str | None, str | None, str | None]:
     Helper to get LLM configuration values, returns:
         - api_key, model, provider
     """
-    api_key, provider_key, model = get_configuration_value(
+    stored_api_key, stored_provider_key, stored_model = get_configuration_value(
         [
             {
                 "key": "LLM_API_KEY",
@@ -86,7 +95,7 @@ def get_llm_config() -> Tuple[str | None, str | None, str | None]:
             },
             {
                 "key": "LLM_PROVIDER",
-                "default": os.environ.get("LLM_PROVIDER", "openai"),
+                "default": os.environ.get("LLM_PROVIDER", "deepseek"),
             },
             {
                 "key": "LLM_MODEL",
@@ -94,6 +103,12 @@ def get_llm_config() -> Tuple[str | None, str | None, str | None]:
             },
         ]
     )
+
+    # Local self-hosted configuration must take precedence so secrets can stay
+    # in the ignored .env file instead of being copied into the database.
+    api_key = os.environ.get("LLM_API_KEY") or stored_api_key
+    provider_key = os.environ.get("LLM_PROVIDER") or stored_provider_key
+    model = os.environ.get("LLM_MODEL") or stored_model
 
     provider = SUPPORTED_PROVIDERS.get(provider_key.lower())
     if not provider:
@@ -128,7 +143,15 @@ def get_llm_response(task, prompt, api_key: str, model: str, provider: str) -> T
         if provider.lower() == "gemini":
             model = f"gemini/{model}"
 
-        client = OpenAI(api_key=api_key)
+        provider_config = SUPPORTED_PROVIDERS.get(provider.lower())
+        if not provider_config:
+            return None, f"Unsupported provider: {provider}"
+
+        client = (
+            OpenAI(api_key=api_key, base_url=provider_config.base_url)
+            if provider_config.base_url
+            else OpenAI(api_key=api_key)
+        )
         chat_completion = client.chat.completions.create(
             model=model, messages=[{"role": "user", "content": final_text}]
         )

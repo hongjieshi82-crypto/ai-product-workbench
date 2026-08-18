@@ -43,6 +43,7 @@ from .case_cluster import (
     CaseClusterSplitEndpoint,
 )
 from .personal_workbench import (
+    PersonalWorkbenchAISuggestionEndpoint,
     PersonalWorkbenchCalendarEndpoint,
     PersonalWorkbenchEndpoint,
     PersonalWorkbenchFieldOptionsEndpoint,

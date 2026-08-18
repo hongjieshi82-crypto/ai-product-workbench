@@ -1,5 +1,6 @@
 import { API_BASE_URL } from "@plane/constants";
 import type {
+  TPersonalWorkbenchAISuggestion,
   TPersonalWorkbenchCalendarItem,
   TPersonalWorkbenchConfig,
   TPersonalWorkbenchItem,
@@ -25,6 +26,10 @@ export class PersonalWorkbenchService extends APIService {
     return this.get("/api/personal-workbench/calendar/").then((response) => response.data);
   }
 
+  async analyzeNaturalLanguage(text: string): Promise<TPersonalWorkbenchAISuggestion> {
+    return this.post("/api/personal-workbench/ai-suggestion/", { text }).then((response) => response.data);
+  }
+
   async updateFieldOptions(
     tableId: string,
     fieldId: string,
@@ -35,8 +40,14 @@ export class PersonalWorkbenchService extends APIService {
     );
   }
 
-  async createItem(section: string, values: Record<string, unknown>): Promise<TPersonalWorkbenchItem> {
-    return this.post("/api/personal-workbench/items/", { section, values }).then((response) => response.data);
+  async createItem(
+    section: string,
+    values: Record<string, unknown>,
+    sourceText?: string
+  ): Promise<TPersonalWorkbenchItem> {
+    return this.post("/api/personal-workbench/items/", { section, values, source_text: sourceText }).then(
+      (response) => response.data
+    );
   }
 
   async updateItem(id: string, values: Record<string, unknown>): Promise<TPersonalWorkbenchItem> {

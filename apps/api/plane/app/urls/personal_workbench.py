@@ -5,6 +5,7 @@
 from django.urls import path
 
 from plane.app.views import (
+    PersonalWorkbenchAISuggestionEndpoint,
     PersonalWorkbenchEndpoint,
     PersonalWorkbenchCalendarEndpoint,
     PersonalWorkbenchFieldOptionsEndpoint,
@@ -15,6 +16,11 @@ from plane.app.views import (
 
 
 urlpatterns = [
+    path(
+        "personal-workbench/ai-suggestion/",
+        PersonalWorkbenchAISuggestionEndpoint.as_view(),
+        name="personal-workbench-ai-suggestion",
+    ),
     path("personal-workbench/", PersonalWorkbenchEndpoint.as_view(), name="personal-workbench"),
     path(
         "personal-workbench/calendar/",

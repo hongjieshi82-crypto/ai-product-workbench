@@ -9,10 +9,14 @@ import { useTheme } from "next-themes";
 import LogoSpinnerDark from "@/app/assets/images/logo-spinner-dark.gif?url";
 import LogoSpinnerLight from "@/app/assets/images/logo-spinner-light.gif?url";
 
-export function LogoSpinner() {
+type TLogoSpinnerProps = {
+  theme?: "dark" | "light";
+};
+
+export function LogoSpinner({ theme }: TLogoSpinnerProps = {}) {
   const { resolvedTheme } = useTheme();
 
-  const logoSrc = resolvedTheme === "dark" ? LogoSpinnerDark : LogoSpinnerLight;
+  const logoSrc = (theme ?? resolvedTheme) === "dark" ? LogoSpinnerDark : LogoSpinnerLight;
 
   return (
     <div className="flex items-center justify-center">
